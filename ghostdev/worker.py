@@ -58,12 +58,20 @@ class Worker:
         self.store.event(task_id, "observation_ready", brief)
         return observation
 
-    async def approval(self, task_id: str, generation: int, action, deadline: float):
+    @staticmethod
+    def target_summary(action, observation: dict) -> dict | None:
+        # What the owner sees when approving an element-targeted action.
+        if action.target < 0:
+            return None
+        element = observation["elements"][action.target]
+        return {"index": action.target, "role": element.get("role", ""), "label": str(element.get("title") or element.get("value") or "")[:120], "x": action.x, "y": action.y}
+
+    async def approval(self, task_id: str, generation: int, action, deadline: float, target: dict | None = None):
         approval_id = uuid.uuid4().hex
         with self.store.connect() as db:
             db.execute("INSERT INTO approvals(id,task_id,generation,digest,action) VALUES(?,?,?,?,?)", (approval_id, task_id, generation, action.digest(), action.model_dump_json()))
         self.store.transition(task_id, "AWAITING_APPROVAL")
-        self.store.event(task_id, "approval_required", {"id": approval_id, "digest": action.digest(), "action": action.model_dump(), "expires_at": time.time()+self.settings.observation_max_age})
+        self.store.event(task_id, "approval_required", {"id": approval_id, "digest": action.digest(), "action": action.model_dump(), "target": target, "expires_at": time.time()+self.settings.observation_max_age})
         while time.monotonic() < deadline:
             task = self.store.task(task_id)
             if task["generation"] != generation or task["state"] != "AWAITING_APPROVAL":
@@ -151,17 +159,19 @@ class Worker:
                     public_project = {"id": project.id, "files": list(workspace.manifest), "entry_file": project.entry_file, "preview_file": project.preview_file, "checks": project.required_checks, "apps": list(self.settings.apps)}
                     action, metric = await self.guarded(self.model.propose(current, observation, self.desktop.image, history, public_project), task_id, generation, deadline)
                     attempted += 1
+                    action = self.desktop.resolve_target(action, observation)
                     self.desktop.validate(action, observation)
                     if current["task_type"] == "inspect" and action.kind in GUI_KINDS | {"apply_patch", "start_preview"}:
                         raise ValueError("Inspection tasks cannot mutate code or desktop")
                     action_id = uuid.uuid4().hex
-                    self.store.event(task_id, "action_proposed", {"id": action_id, "action": action.model_dump(), "inference": metric})
+                    target = self.target_summary(action, observation)
+                    self.store.event(task_id, "action_proposed", {"id": action_id, "action": action.model_dump(), "target": target, "inference": metric})
                     if action.kind == "finish":
                         await self.verify(task_id, workspace, observation, gui_evidence, guard)
                         return
                     needs_approval = current["mode"] == "review-first" and action.kind in GUI_KINDS - {"wait"}
                     if needs_approval:
-                        await self.approval(task_id, generation, action, deadline)
+                        await self.approval(task_id, generation, action, deadline, target)
                     guard()
                     if action.kind in GUI_KINDS:
                         if action.kind == "launch_app" and action.app == "browser":

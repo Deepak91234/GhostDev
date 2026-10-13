@@ -51,6 +51,13 @@
       "title": "Path",
       "type": "string"
     },
+    "target": {
+      "default": -1,
+      "maximum": 499,
+      "minimum": -1,
+      "title": "Target",
+      "type": "integer"
+    },
     "x": {
       "default": 0,
       "maximum": 10000,

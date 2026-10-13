@@ -19,6 +19,8 @@ class Action(Strict):
     postcondition: str = Field(max_length=300)
     app: str = ""
     path: str = ""
+    # Index into the observation's elements; the controller resolves it to that element's center.
+    target: int = Field(default=-1, ge=-1, le=499)
     x: int = Field(default=0, ge=0, le=10000)
     y: int = Field(default=0, ge=0, le=10000)
     text: str = Field(default="", max_length=8000)

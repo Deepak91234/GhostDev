@@ -27,6 +27,8 @@ def main():
     commands.add_parser("serve")
     commands.add_parser("worker")
     commands.add_parser("doctor")
+    bench = commands.add_parser("bench")
+    bench.add_argument("--runs", type=int, default=3, choices=range(1, 21), metavar="1-20")
     commands.add_parser("pair")
     confirm = commands.add_parser("confirm")
     confirm.add_argument("pairing_id")
@@ -86,6 +88,21 @@ def main():
                 store.transition(task_id, "PAUSED", revoke=True)
                 store.event(task_id, "desktop_control_changed", {"owner": "human", "source": "local CLI"})
             print("Agent input revoked. Prior actions are not undone.")
+        elif args.command == "bench":
+            import httpx
+            from .bench import run_bench
+            try:
+                report = asyncio.run(run_bench(settings, args.runs))
+            except httpx.HTTPError as exc:
+                raise ValueError("Local model server unreachable: "+str(exc)) from exc
+            target = settings.state_dir/"bench"
+            target.mkdir(exist_ok=True, mode=0o700)
+            path = target/("bench-"+report["started"].replace(":", "").replace("+0000", "Z")+".json")
+            path.write_text(json.dumps(report, indent=2))
+            path.chmod(0o600)
+            print(json.dumps({"summary": report["summary"], "runtime": report["runtime"], "report": str(path), "scope": report["evidence_scope"]}, indent=2))
+            if report["summary"]["grounded"] < report["summary"]["runs"]:
+                sys.exit(3)
         elif args.command == "doctor":
             report = {"desktop": MacDesktop(settings).doctor(), "docker": bool(shutil.which("docker")), "phone_ui_built": (settings.web_dir/"index.html").exists(), "model": {"ready": False}, "hardware_tested_here": False}
             try:

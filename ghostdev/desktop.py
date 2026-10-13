@@ -18,12 +18,41 @@ from .contracts import Action
 
 
 GUI_KINDS = {"launch_app", "focus_app", "click", "double_click", "type_text", "scroll", "hotkey", "wait"}
+TARGETED_KINDS = {"click", "double_click", "scroll"}
 ALLOWED_KEYS = {("command", "s"), ("command", "a"), ("left",), ("right",), ("up",), ("down",), ("enter",), ("backspace",), ("tab",)}
 
 
 def input_point(observation: dict, x: int, y: int) -> tuple[float, float]:
     bounds = observation["bounds"]
     return (bounds["X"]+x*bounds["Width"]/observation["image_width"], bounds["Y"]+y*bounds["Height"]/observation["image_height"])
+
+
+def visible_box(bounds, width: int, height: int) -> tuple[int, int, int, int] | None:
+    """Part of an image-relative [x, y, w, h] element box inside the captured window image."""
+    if not (isinstance(bounds, list) and len(bounds) == 4 and all(isinstance(v, int) for v in bounds)):
+        return None
+    left, top = max(0, bounds[0]), max(0, bounds[1])
+    right, bottom = min(width, bounds[0]+bounds[2]), min(height, bounds[1]+bounds[3])
+    if right <= left or bottom <= top:
+        return None
+    return left, top, right, bottom
+
+
+def element_center(observation: dict, index: int) -> tuple[int, int]:
+    elements = observation.get("elements", [])
+    if not 0 <= index < len(elements):
+        raise ValueError("Target element is not in the current observation")
+    box = visible_box(elements[index].get("bounds"), observation["image_width"], observation["image_height"])
+    if box is None:
+        raise ValueError("Target element is not visible in the captured window")
+    return (box[0]+box[2])//2, (box[1]+box[3])//2
+
+
+def scroll_point(action: Action, observation: dict) -> tuple[int, int]:
+    # Without a target or explicit point, scroll the middle of the approved window.
+    if action.target >= 0 or action.x or action.y:
+        return action.x, action.y
+    return observation["image_width"]//2, observation["image_height"]//2
 
 
 class DesktopUnavailable(RuntimeError):
@@ -143,6 +172,15 @@ class MacDesktop:
         observation.update({"title": title, "pid": pid, "document": document, "window_id": int(window["kCGWindowNumber"]), "image_width": image.width, "image_height": image.height, "bounds": dict(bounds), "elements": nodes, "focus_role": focus_role, "signature": f"{bundle}:{pid}:{document}:{window['kCGWindowNumber']}:{dict(bounds)}:{focus_role}:{structure}"})
         return observation
 
+    def resolve_target(self, action: Action, observation: dict) -> Action:
+        """Replace a target element index with concrete coordinates BEFORE approval, so the owner approves what executes."""
+        if action.target < 0:
+            return action
+        if action.kind not in TARGETED_KINDS:
+            raise ValueError("target applies only to click, double_click, and scroll")
+        x, y = element_center(observation, action.target)
+        return action.model_copy(update={"x": x, "y": y})
+
     def validate(self, action: Action, observation: dict):
         if action.observation_id != observation["id"]:
             raise ValueError("Action references a stale observation")
@@ -154,8 +192,17 @@ class MacDesktop:
             raise ValueError("Input outside approved windows is disabled")
         if action.kind in {"launch_app", "focus_app"} and action.app not in self.settings.apps:
             raise ValueError("App is not registered")
+        if action.target >= 0:
+            if action.kind not in TARGETED_KINDS:
+                raise ValueError("target applies only to click, double_click, and scroll")
+            if (action.x, action.y) != element_center(observation, action.target):
+                raise ValueError("Coordinates do not match the target element; re-observe")
         if action.kind in {"click", "double_click"} and not (0 <= action.x < observation["image_width"] and 0 <= action.y < observation["image_height"]):
             raise ValueError("Coordinates outside current window screenshot")
+        if action.kind == "scroll":
+            x, y = scroll_point(action, observation)
+            if not (0 <= x < observation["image_width"] and 0 <= y < observation["image_height"]):
+                raise ValueError("Scroll point outside current window screenshot")
         if action.kind == "type_text":
             if observation["app"] != "editor":
                 raise ValueError("MVP typing is restricted to the prepared editor; browser address fields are disabled")
@@ -197,6 +244,7 @@ class MacDesktop:
             subprocess.run(["/usr/bin/osascript", "-e", 'tell application id "'+bundle+'" to activate'], check=True, timeout=5)
         elif action.kind in {"click", "double_click"}:
             point = input_point(observation, action.x, action.y)
+            self._pointer(point)
             for click in range(2 if action.kind == "double_click" else 1):
                 guard()
                 for event_type in (self.Q.kCGEventLeftMouseDown, self.Q.kCGEventLeftMouseUp):
@@ -220,7 +268,11 @@ class MacDesktop:
                     self.Q.CGEventKeyboardSetUnicodeString(event, len(chunk.encode("utf-16-le"))//2, chunk)
                     self.Q.CGEventPost(self.Q.kCGHIDEventTap, event)
         elif action.kind == "scroll":
+            # Wheel events go to whatever window is under the pointer, so place it inside the approved window first.
+            point = input_point(observation, *scroll_point(action, observation))
+            self._pointer(point)
             event = self.Q.CGEventCreateScrollWheelEvent(None, self.Q.kCGScrollEventUnitLine, 1, action.amount)
+            self.Q.CGEventSetLocation(event, point)
             self.Q.CGEventPost(self.Q.kCGHIDEventTap, event)
         elif action.kind == "hotkey":
             mapping = {"s": 1, "a": 0, "left": 123, "right": 124, "up": 126, "down": 125, "enter": 36, "backspace": 51, "tab": 48}
@@ -234,3 +286,8 @@ class MacDesktop:
                 guard()
                 time.sleep(0.1)
         return {"dispatched": True, "effect_confirmed": False, "note": "Next observation records visible effects; dispatch is not proof of success"}
+
+    def _pointer(self, point: tuple[float, float]):
+        event = self.Q.CGEventCreateMouseEvent(None, self.Q.kCGEventMouseMoved, point, self.Q.kCGMouseButtonLeft)
+        self.Q.CGEventPost(self.Q.kCGHIDEventTap, event)
+        time.sleep(0.05)
