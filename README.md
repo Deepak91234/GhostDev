@@ -18,7 +18,7 @@ python -m pip install -e '.[mac]'
 ghostdev init
 ```
 
-The archive includes the compiled phone web UI, so a frontend build is optional. To modify/rebuild it:
+The uploaded archive included the compiled phone web UI; a git checkout does not (`apps/mobile/dist` is ignored), so build it once, and again after changing the UI:
 
 ```sh
 cd apps/mobile
@@ -63,11 +63,19 @@ ghostdev use-local-model
 
 This changes only inference settings to the local defaults and preserves registered projects, state-directory location, app permissions, and phone origins. It does not download weights or delete tasks. Reusing an old loopback forwarding port will not move inference onto the Mac; use the new local server directly.
 
-You may select a different downloaded local model with `ghostdev use-local-model --model YOUR_MODEL --publisher ITS_PUBLISHER`. No publisher is required. Text-only models receive bounded Accessibility data; they cannot read screenshots. A compatible VLM can be enabled explicitly with `model_vision: true` after testing its local image API and grounding. The phone still receives actual approved-window screenshots in text mode.
+You may select a different downloaded local model with `ghostdev use-local-model --model YOUR_MODEL --publisher ITS_PUBLISHER`. No publisher is required. Text-only models receive bounded Accessibility data; they cannot read screenshots. A compatible VLM can be enabled explicitly with `model_vision: true` after testing its local image API and grounding. Image tokens are not part of the controller's prompt estimate; if the server reports that a step used the whole context, that step is rejected, so raise `model_context_tokens` after checking memory. The phone still receives actual approved-window screenshots in text mode.
 
 An alternative local OpenAI-compatible server can run **on this Mac** with `model_backend: "openai-compatible"`, a literal loopback `/v1` endpoint and its real model ID. It must support structured JSON responses. Non-loopback endpoints, remote/cloud Ollama models, redirects, and cloud fallbacks are disabled. There is no automatic hardware offload.
 
-Run `ghostdev doctor` to check server/model metadata and native permissions. Run a real task and `ollama ps` on the Mac to see local processing; an offline rehearsal is still required before claiming verified local execution. A loopback URL alone cannot prove that someone has not manually configured a forwarding proxy.
+Run `ghostdev doctor` to check server/model metadata and native permissions. Then measure the model on this Mac:
+
+```sh
+ghostdev bench --runs 5
+```
+
+It sends the configured model one fixed TextEdit observation per run and records latency (the first run usually includes loading weights), server-reported prompt/output tokens, output tokens per second, whether the JSON action was valid, and whether its click lands on the report's text area. It also records macOS/CPU/memory, the Ollama version, and the loaded model's CPU/GPU split as `ollama ps` reports it. The report is written to `.state/bench/`; the command exits 3 if any run missed the text area. It sends no desktop input, so it measures the model only, not capture, input, or task completion.
+
+Run a real task and `ollama ps` on the Mac to see local processing; an offline rehearsal is still required before claiming verified local execution. A loopback URL alone cannot prove that someone has not manually configured a forwarding proxy.
 
 ## Phone access and pairing
 
@@ -110,7 +118,7 @@ On the phone, select **Cart demo → Desktop task → Approve each GUI action**.
 
 > Open GhostDev Report.txt in the editor. Click its text field, add the exact expected note, and save. Start the local report preview, open it in the browser, and scroll to the summary. Finish only when the saved note is visible there.
 
-The agent proposes JSON actions, validates them, executes one action, and observes again. It can launch/focus TextEdit or an isolated Chrome profile; click/double-click; type Unicode in the prepared editor; scroll; and use a small shortcut allowlist. Typing into browser address fields, Terminal, password fields, or unapproved windows is disabled. Screenshots cover the approved application window, never the full personal desktop. TextEdit should use plain text for the `.txt` fixture; disable smart substitutions during the demo if they alter the note.
+The agent proposes JSON actions, validates them, executes one action, and observes again. To click or scroll, the model names an Accessibility element by its index (`target`) and the controller computes the centre of its visible bounds before approval, so the owner approves exact coordinates and a small text model does no pixel arithmetic. Before a click or scroll, the pointer is moved inside the approved window, because macOS delivers wheel events to whatever window is under the pointer. Each request is fitted to `model_context_tokens`: Accessibility text, history, and tool output are compacted in stages, and a request that still cannot fit is refused rather than silently truncated by the model server. Server-reported token counts and latency are recorded with every proposal. It can launch/focus TextEdit or an isolated Chrome profile; click/double-click; type Unicode in the prepared editor; scroll; and use a small shortcut allowlist. Typing into browser address fields, Terminal, password fields, or unapproved windows is disabled. Screenshots cover the approved application window, never the full personal desktop. TextEdit should use plain text for the `.txt` fixture; disable smart substitutions during the demo if they alter the note.
 
 Completion requires actual GUI click/type/scroll evidence across editor and browser, a real final browser capture, the expected text in the saved task document, and matching browser Accessibility text. A model saying “done” cannot satisfy these checks. Desktop edits remain in the task copy. The original project is not modified by this workflow.
 
