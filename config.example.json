@@ -1,0 +1,54 @@
+{
+  "state_dir": ".state",
+  "model_backend": "ollama",
+  "model_url": "http://127.0.0.1:11434",
+  "model_name": "qwen3:4b",
+  "model_publisher": "Qwen",
+  "model_vision": false,
+  "model_think": false,
+  "model_context_tokens": 8192,
+  "hardware_evidence": "",
+  "origins": [
+    "http://127.0.0.1:8765",
+    "http://localhost:8765"
+  ],
+  "secure_cookies": true,
+  "host": "127.0.0.1",
+  "port": 8765,
+  "max_steps": 40,
+  "task_timeout": 600,
+  "inference_timeout": 90,
+  "observation_max_age": 60,
+  "apps": {
+    "editor": "com.apple.TextEdit",
+    "browser": "com.google.Chrome"
+  },
+  "projects": [
+    {
+      "id": "cart",
+      "name": "Cart demo",
+      "root": "demo/cart-app",
+      "writable": [
+        "*.txt",
+        "*.md",
+        "*.js",
+        "*.html",
+        "*.css",
+        "*.json"
+      ],
+      "checks": {
+        "cart": [
+          "node",
+          "/verification/cart-check.cjs"
+        ]
+      },
+      "required_checks": [
+        "cart"
+      ],
+      "image": "ghostdev-runner:local",
+      "entry_file": "GhostDev Report.txt",
+      "preview_file": "index.html"
+    }
+  ],
+  "web_dir": "apps/mobile/dist"
+}

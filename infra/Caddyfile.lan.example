@@ -1,0 +1,7 @@
+# Replace 192.168.1.10 with this Mac's actual LAN IP, and use this exact
+# HTTPS origin in GhostDev config.json. Caddy runs ON THE MAC, not another server.
+# Trust Caddy's generated local root certificate on your own phone before pairing.
+https://192.168.1.10:8443 {
+    tls internal
+    reverse_proxy 127.0.0.1:8765
+}

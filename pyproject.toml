@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ghostdev"
+version = "0.2.0"
+description = "Phone-controlled Mac desktop agent with inference on the same Mac"
+requires-python = ">=3.11"
+dependencies = ["fastapi==0.143.0", "uvicorn==0.54.0", "httpx==0.28.1", "pydantic==2.14.0", "pillow==12.3.0", "websockets==15.0.1"]
+
+[project.optional-dependencies]
+mac = ["pyobjc-framework-Cocoa==12.2; sys_platform == 'darwin'", "pyobjc-framework-Quartz==12.2; sys_platform == 'darwin'", "pyobjc-framework-ApplicationServices==12.2; sys_platform == 'darwin'"]
+test = ["pytest==9.1.1"]
+
+[project.scripts]
+ghostdev = "ghostdev.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ghostdev*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

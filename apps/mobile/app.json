@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "GhostDev",
+    "slug": "ghostdev",
+    "scheme": "ghostdev",
+    "platforms": ["web"],
+    "web": {"bundler": "metro", "output": "single", "name": "GhostDev", "shortName": "GhostDev", "themeColor": "#090f16"},
+    "plugins": ["expo-router"]
+  }
+}

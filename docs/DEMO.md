@@ -1,0 +1,16 @@
+# Physical rehearsal checklist
+
+This checklist must be completed on the actual Mac and phone before presenting a working hardware demo. No results are prefilled.
+
+1. **Model provenance and locality.** On the Mac, record the actual downloaded model/publisher, quantization, Ollama version, serving PID, CPU/GPU processing from `ollama ps`, and actual latency. Confirm this is not an Ollama cloud model. Download all dependencies/images/weights before disconnecting external egress.
+2. **Mac input/capture.** Run doctor in the Terminal that will start the worker. Confirm local Accessibility/Screen Recording grants, one active display, prepared plain-text report, Chrome installed, no personal apps/accounts. Test an observed click, unique Unicode note, save, app switch, scroll, and final capture. Check AX coordinate bounds against the resized window image on your Retina display.
+3. **Phone pairing.** Use the exact Mac-hosted HTTPS origin in config; pair with one-time code and local matching-ID confirmation. Confirm no authorized route works in another unpaired browser. Run `ghostdev revoke` and verify the old session loses access, including WebSockets.
+4. **Desktop slice.** Send a report request with exact expected text. Approve actual proposals. Completion requires saved text and browser AX evidence plus a final screenshot, not only dispatch. Repeat with changed note and changed window size/position. No fixed-coordinate trajectory exists in the production agent.
+5. **Control.** Pause during a pending inference request; confirm no input executes. Resume and confirm a new observation. Take over locally; try an old approval and confirm rejection. Stop; inspect any partial effects and confirm no queued input. Restart worker during a prepared task; task must become INTERRUPTED, with no automatic replay.
+6. **Coding.** Prebuild runner image. Show original protected check failure; ask the local model for a repair. Require the same three cases passing on the final diff, a browser capture, and real click/type/scroll evidence. Edit the original from another terminal before Apply and confirm refusal; repeat cleanly and apply only the reviewed hash.
+7. **Reconnect.** Disconnect/reconnect phone. Confirm the task persisted and event sequence resumes without duplicate actions.
+8. **Offline.** Block internet egress on the host/model server while retaining LAN access. Run the desktop slice again. Capture evidence of local Mac inference. Do not claim “no network”; the phone/controller/model still exchange traffic locally.
+
+Suggested presentation: “I ask from my phone; the model runs the reasoning on the same Mac; the Mac executes approved desktop actions; the phone shows actual state, and saved output/tests determine success.” Do not say Agent S, universal app control, host sandboxing, or fully offline voice is implemented.
+
+If the local model cannot finish reliably: keep the reported failure, reduce to one short observed input task, and disclose the limitation. A simulated test or file-only patch is not a successful desktop demo.

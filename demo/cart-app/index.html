@@ -1,0 +1,7 @@
+<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>GhostDev Cart</title>
+<style>body{margin:0;padding:40px;background:#101722;color:#edf4f1;font:20px system-ui}main{max-width:650px;margin:auto}h1{font-size:40px}button{padding:14px;border:0;border-radius:10px;background:#9ef3cc;color:#10251b;font-size:20px}section{height:720px}strong{color:#9ef3cc;font-size:48px}</style></head>
+<body><main><p>GHOSTDEV / DEMO FIXTURE</p><h1>Your local cart</h1><p>Notebook · $10 each</p><button id="minus">−</button> <span id="qty">1</span> <button id="plus">+</button><section><p>Scroll to the order summary.</p></section><h2>Order summary</h2><strong id="total">$10.00</strong><p>No accounts or payments. This is a prepared test project.</p></main><script src="cart.js"></script><script>
+let quantity=1; function refresh(){document.getElementById('qty').textContent=quantity;document.getElementById('total').textContent='$'+calculateTotal(10,quantity).toFixed(2)}
+document.getElementById('plus').onclick=()=>{quantity++;refresh()}; document.getElementById('minus').onclick=()=>{quantity=Math.max(1,quantity-1);refresh()};
+</script></body></html>

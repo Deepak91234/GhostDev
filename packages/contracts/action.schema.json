@@ -1,0 +1,123 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "enum": [
+        "launch_app",
+        "focus_app",
+        "click",
+        "double_click",
+        "type_text",
+        "scroll",
+        "hotkey",
+        "wait",
+        "list_files",
+        "read_file",
+        "search_code",
+        "apply_patch",
+        "run_check",
+        "start_preview",
+        "export_file",
+        "finish"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "observation_id": {
+      "title": "Observation Id",
+      "type": "string"
+    },
+    "expected_app": {
+      "title": "Expected App",
+      "type": "string"
+    },
+    "summary": {
+      "maxLength": 300,
+      "title": "Summary",
+      "type": "string"
+    },
+    "postcondition": {
+      "maxLength": 300,
+      "title": "Postcondition",
+      "type": "string"
+    },
+    "app": {
+      "default": "",
+      "title": "App",
+      "type": "string"
+    },
+    "path": {
+      "default": "",
+      "title": "Path",
+      "type": "string"
+    },
+    "x": {
+      "default": 0,
+      "maximum": 10000,
+      "minimum": 0,
+      "title": "X",
+      "type": "integer"
+    },
+    "y": {
+      "default": 0,
+      "maximum": 10000,
+      "minimum": 0,
+      "title": "Y",
+      "type": "integer"
+    },
+    "text": {
+      "default": "",
+      "maxLength": 8000,
+      "title": "Text",
+      "type": "string"
+    },
+    "amount": {
+      "default": 0,
+      "maximum": 8,
+      "minimum": -8,
+      "title": "Amount",
+      "type": "integer"
+    },
+    "keys": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 3,
+      "title": "Keys",
+      "type": "array"
+    },
+    "seconds": {
+      "default": 1,
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Seconds",
+      "type": "integer"
+    },
+    "check_id": {
+      "default": "",
+      "title": "Check Id",
+      "type": "string"
+    },
+    "old": {
+      "default": "",
+      "maxLength": 20000,
+      "title": "Old",
+      "type": "string"
+    },
+    "new": {
+      "default": "",
+      "maxLength": 20000,
+      "title": "New",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "observation_id",
+    "expected_app",
+    "summary",
+    "postcondition"
+  ],
+  "title": "Action",
+  "type": "object"
+}
