@@ -8,11 +8,12 @@ This repository contains an implemented first release: Expo mobile web UI, FastA
 
 Use a dedicated demo user/session without personal apps/accounts. Requirements: Python 3.11+, Node 24.19+, Google Chrome, and optional Docker Desktop for coding checks. macOS native control is the sole desktop target. An institutional Mac may require IT permission for Accessibility/Screen Recording; No remote shell or separate inference computer is required.
 
-From the extracted `ghostdev` directory:
+The `python3` that macOS provides is usually 3.9, which cannot install the pinned dependencies. Install Python 3.12 from python.org or with `brew install python@3.12`, and confirm `python3.12 --version` works. From the repository directory:
 
 ```sh
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -r requirements.lock
 python -m pip install -e '.[mac]'
 ghostdev init
