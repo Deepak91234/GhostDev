@@ -24,6 +24,8 @@ Checks: no network. Preview: loopback, bounded project paths, no listing, CSP pr
 
 ## Local control and failures
 
+Element-targeted clicks aim at the centre of the element's Accessibility frame, clipped to the captured window. GhostDev does not hit-test that point, so something drawn over the element, such as a sticky page header, would receive the click; the approval card names the targeted element, not whatever is on top. Elements Chrome reports as 1-point strips because they are scrolled out of view are not targetable. Use pages without overlays for the demo.
+
 Each action binds task generation, observation ID, expected focus, exact arguments/digest, and a bounded execution lease. Approvals expire. Time spent awaiting approval extends the task deadline by exactly that wait, which each expiry bounds; time spent paused still counts. Pause/stop/takeover revoke the lease; resume re-observes. Checks are killed on lease revocation. A typing interruption can leave partial text; no uncertain action is automatically replayed. Stop cannot undo external or already completed effects.
 
 Screenshots/action logs may contain prepared source/documents. Stored state is chmod 0700 and the database 0600. There is no at-rest encryption, automatic retention policy, remote account administration, security certification, or audit-proof signature chain in this MVP. Delete this dedicated demo state locally after reviewing evidence if no longer needed.
