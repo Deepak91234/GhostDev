@@ -115,7 +115,7 @@ The phone completes the exchange automatically. The code expires in five minutes
 
 ## First desktop task
 
-On the phone, select **Cart demo → Desktop task → Approve each GUI action**. Set exact expected note text, for example `Local AI keeps my work on my own machines`, and request:
+On the phone, select **Cart demo → Desktop task → Approve each GUI action**. Time spent waiting for your approval does not count against `task_timeout`; each wait still ends when its observation expires (`observation_max_age`, 60 s by default), after which the task pauses and must be resumed. Set exact expected note text, for example `Local AI keeps my work on my own machines`, and request:
 
 > Open GhostDev Report.txt in the editor. Click its text field, add the exact expected note, and save. Start the local report preview, open it in the browser, and scroll to the summary. Finish only when the saved note is visible there.
 

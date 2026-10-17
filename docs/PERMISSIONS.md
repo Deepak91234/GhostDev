@@ -24,7 +24,7 @@ Checks: no network. Preview: loopback, bounded project paths, no listing, CSP pr
 
 ## Local control and failures
 
-Each action binds task generation, observation ID, expected focus, exact arguments/digest, and a bounded execution lease. Approvals expire. Pause/stop/takeover revoke the lease; resume re-observes. Checks are killed on lease revocation. A typing interruption can leave partial text; no uncertain action is automatically replayed. Stop cannot undo external or already completed effects.
+Each action binds task generation, observation ID, expected focus, exact arguments/digest, and a bounded execution lease. Approvals expire. Time spent awaiting approval extends the task deadline by exactly that wait, which each expiry bounds; time spent paused still counts. Pause/stop/takeover revoke the lease; resume re-observes. Checks are killed on lease revocation. A typing interruption can leave partial text; no uncertain action is automatically replayed. Stop cannot undo external or already completed effects.
 
 Screenshots/action logs may contain prepared source/documents. Stored state is chmod 0700 and the database 0600. There is no at-rest encryption, automatic retention policy, remote account administration, security certification, or audit-proof signature chain in this MVP. Delete this dedicated demo state locally after reviewing evidence if no longer needed.
 
