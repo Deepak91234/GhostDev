@@ -45,8 +45,10 @@ def observation() -> dict:
 
 
 def grade(action, current: dict) -> dict:
-    if action.observation_id != current["id"] or action.expected_app != current["app"]:
-        return {"valid": True, "grounded": False, "reason": "Action is not bound to the current observation and app"}
+    if action.observation_id != current["id"]:
+        return {"valid": True, "grounded": False, "reason": f"observation_id {action.observation_id[:40]!r} does not match the current observation {current['id']!r}"}
+    if action.expected_app != current["app"]:
+        return {"valid": True, "grounded": False, "reason": f"expected_app is {action.expected_app[:40]!r}; the current app is {current['app']!r}"}
     if action.kind != "click":
         return {"valid": True, "grounded": False, "reason": f"Proposed {action.kind}; a click on the text area was expected"}
     try:
@@ -93,7 +95,9 @@ async def run_bench(settings: Settings, runs: int, transport=None) -> dict:
         started = time.monotonic()
         try:
             action, metric = await model.propose(TASK, current, None, [], PROJECT)
-            outcome = {**grade(action, current), "action": action.model_dump(include={"kind", "target", "x", "y", "expected_app", "summary"}), "inference": metric}
+            proposed = action.model_dump(include={"kind", "target", "x", "y", "expected_app", "summary", "text"})
+            proposed["text"] = proposed["text"][:80]
+            outcome = {**grade(action, current), "action": proposed, "inference": metric}
         except (ValueError, httpx.HTTPError) as exc:
             outcome = {"valid": False, "grounded": False, "reason": str(exc)[:300], "inference": {}}
         report["runs"].append({"run": index+1, "wall_seconds": round(time.monotonic()-started, 3), **outcome})

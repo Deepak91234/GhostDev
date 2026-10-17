@@ -66,13 +66,15 @@ class Worker:
         element = observation["elements"][action.target]
         return {"index": action.target, "role": element.get("role", ""), "label": str(element.get("title") or element.get("value") or "")[:120], "x": action.x, "y": action.y}
 
-    async def approval(self, task_id: str, generation: int, action, deadline: float, target: dict | None = None):
+    async def approval(self, task_id: str, generation: int, action, target: dict | None = None):
         approval_id = uuid.uuid4().hex
         with self.store.connect() as db:
             db.execute("INSERT INTO approvals(id,task_id,generation,digest,action) VALUES(?,?,?,?,?)", (approval_id, task_id, generation, action.digest(), action.model_dump_json()))
         self.store.transition(task_id, "AWAITING_APPROVAL")
         self.store.event(task_id, "approval_required", {"id": approval_id, "digest": action.digest(), "action": action.model_dump(), "target": target, "expires_at": time.time()+self.settings.observation_max_age})
-        while time.monotonic() < deadline:
+        # Observation expiry below normally ends the wait first; this monotonic cap guards against wall-clock jumps.
+        limit = time.monotonic()+self.settings.observation_max_age+5
+        while time.monotonic() < limit:
             task = self.store.task(task_id)
             if task["generation"] != generation or task["state"] != "AWAITING_APPROVAL":
                 raise LeaseRevoked("Approval lease revoked")
@@ -90,7 +92,7 @@ class Worker:
                 self.store.event(task_id, "action_rejected", {"reason": "Approval expired; resume to observe and replan"})
                 raise LeaseRevoked("Approval expired")
             await asyncio.sleep(0.15)
-        raise TimeoutError("Task deadline exceeded awaiting approval")
+        raise TimeoutError("Approval wait exceeded the observation lifetime")
 
     async def run_task(self, initial: dict):
         task_id = initial["id"]
@@ -171,7 +173,12 @@ class Worker:
                         return
                     needs_approval = current["mode"] == "review-first" and action.kind in GUI_KINDS - {"wait"}
                     if needs_approval:
-                        await self.approval(task_id, generation, action, deadline, target)
+                        waiting = time.monotonic()
+                        try:
+                            await self.approval(task_id, generation, action, target)
+                        finally:
+                            # The owner's decision time is not agent time. Each wait ends by observation expiry, so the extension stays bounded.
+                            deadline += time.monotonic()-waiting
                     guard()
                     if action.kind in GUI_KINDS:
                         if action.kind == "launch_app" and action.app == "browser":

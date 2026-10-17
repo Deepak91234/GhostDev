@@ -100,7 +100,8 @@ def main():
             path = target/("bench-"+report["started"].replace(":", "").replace("+0000", "Z")+".json")
             path.write_text(json.dumps(report, indent=2))
             path.chmod(0o600)
-            print(json.dumps({"summary": report["summary"], "runtime": report["runtime"], "report": str(path), "scope": report["evidence_scope"]}, indent=2))
+            failed = [{key: run.get(key) for key in ("run", "reason", "action")} for run in report["runs"] if not run["grounded"]]
+            print(json.dumps({"summary": report["summary"], "failed_runs": failed, "runtime": report["runtime"], "report": str(path), "scope": report["evidence_scope"]}, indent=2))
             if report["summary"]["grounded"] < report["summary"]["runs"]:
                 sys.exit(3)
         elif args.command == "doctor":

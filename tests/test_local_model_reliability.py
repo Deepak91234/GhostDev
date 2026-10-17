@@ -195,7 +195,7 @@ def test_approval_request_shows_the_target_element(environment):
         store.update(task["id"], observation=observed)
         proposed = MacDesktop(settings).resolve_target(action(observation_id=observed["id"], target=0), observed)
         target = Worker.target_summary(proposed, observed)
-        waiting = asyncio.create_task(Worker(settings, store, FakeDesktop(settings), FixtureModel()).approval(task["id"], 0, proposed, time.monotonic()+5, target))
+        waiting = asyncio.create_task(Worker(settings, store, FakeDesktop(settings), FixtureModel()).approval(task["id"], 0, proposed, target))
         await asyncio.sleep(0.3)
         event = next(e["payload"] for e in store.events(task["id"]) if e["type"] == "approval_required")
         assert event["target"] == {"index": 0, "role": "AXTextArea", "label": "Report", "x": 200, "y": 100}
@@ -244,6 +244,75 @@ def test_bench_cli_writes_private_report_and_exit_status(environment, tmp_path, 
     path = Path(printed["report"])
     assert path.parent == settings.state_dir/"bench" and stat.S_IMODE(path.stat().st_mode) == 0o600
     assert json.loads(path.read_text())["summary"]["grounded"] == 0
+    # The terminal output names each miss, so the report file is not needed to see why.
+    assert printed["failed_runs"] == [{"run": 1, "reason": "Click lands outside the text area", "action": {"kind": "click", "target": -1, "x": 5, "y": 5, "expected_app": "editor", "summary": "Click", "text": ""}}]
+
+
+@pytest.mark.parametrize("change,reason", [
+    ({"observation_id": "invented"}, "observation_id 'invented' does not match"),
+    ({"expected_app": "TextEdit"}, "expected_app is 'TextEdit'; the current app is 'editor'"),
+    ({"kind": "type_text", "text": "Local AI keeps my work on my own machines"}, "Proposed type_text"),
+])
+def test_bench_names_the_exact_reason_a_run_missed(environment, change, reason):
+    settings = environment[0]
+    def proposal(payload):
+        current = json.loads(payload["messages"][-1]["content"])["observation"]
+        return {"kind": "click", "target": bench.TEXT_AREA, "observation_id": current["id"], "expected_app": "editor", "summary": "Click", "postcondition": "Focus", **change}
+    run = asyncio.run(bench.run_bench(settings, 1, httpx.MockTransport(chat_handler(settings, proposal))))["runs"][0]
+    assert run["grounded"] is False and reason in run["reason"]
+    assert run["action"]["text"] == change.get("text", "")
+
+
+def test_owner_approval_time_does_not_consume_the_task_deadline(environment, monkeypatch):
+    """Six slow approvals add two simulated minutes against a 10 s task budget; only agent time counts."""
+    import ghostdev.worker as worker_module
+    settings, store, _ = environment
+    settings = settings.model_copy(update={"task_timeout": 10})
+    real = time.monotonic
+    class Clock:
+        offset = 0.0
+        monotonic = staticmethod(lambda: real()+Clock.offset)
+        time = staticmethod(time.time)
+    monkeypatch.setattr(worker_module, "time", Clock)
+    async def scenario():
+        task = store.submit(request(mode="review-first"))
+        store.claim()
+        running = asyncio.create_task(Worker(settings, store, FakeDesktop(settings), FixtureModel()).run_task(task))
+        approved = 0
+        while not running.done():
+            with store.connect() as db:
+                pending = db.execute("SELECT id FROM approvals WHERE task_id=? AND status='pending'", (task["id"],)).fetchone()
+            if pending and store.task(task["id"])["state"] == "AWAITING_APPROVAL":
+                Clock.offset += 20
+                with store.connect() as db:
+                    db.execute("UPDATE approvals SET status='approved' WHERE id=?", (pending[0],))
+                approved += 1
+            await asyncio.sleep(0.05)
+        await running
+        return task["id"], approved
+    task_id, approved = asyncio.run(scenario())
+    assert approved == 6 and Clock.offset == 120
+    assert store.task(task_id)["state"] == "COMPLETED", store.task(task_id).get("error")
+
+
+def test_agent_time_still_hits_the_task_deadline(environment, monkeypatch):
+    import ghostdev.worker as worker_module
+    settings, store, _ = environment
+    settings = settings.model_copy(update={"task_timeout": 10})
+    real = time.monotonic
+    class Clock:
+        offset = 0.0
+        monotonic = staticmethod(lambda: real()+Clock.offset)
+        time = staticmethod(time.time)
+    monkeypatch.setattr(worker_module, "time", Clock)
+    class Slow(FixtureModel):
+        async def propose(self, *args):
+            Clock.offset += 4
+            return await super().propose(*args)
+    task = store.submit(request())
+    store.claim()
+    asyncio.run(Worker(settings, store, FakeDesktop(settings), Slow()).run_task(task))
+    assert store.task(task["id"])["state"] == "FAILED" and "budget" in store.task(task["id"])["error"]
 
 
 def test_published_contract_matches_runtime_action_model():
