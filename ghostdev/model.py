@@ -8,7 +8,7 @@ import httpx
 
 from .config import Settings
 from .contracts import Action
-from .prompt import OUTPUT_TOKENS, SYSTEM, build_context
+from .prompt import OUTPUT_TOKENS, SYSTEM, build_context, decoding_schema
 
 
 def processor_split(model: dict) -> str:
@@ -92,7 +92,7 @@ class LocalModel:
         if self.settings.model_backend == "ollama":
             if self.settings.model_vision and image_bytes:
                 messages[-1]["images"] = [base64.b64encode(image_bytes).decode()]
-            payload = {"model": self.settings.model_name, "messages": messages, "stream": False, "format": Action.model_json_schema(), "options": {"temperature": 0, "num_predict": OUTPUT_TOKENS, "num_ctx": num_ctx}}
+            payload = {"model": self.settings.model_name, "messages": messages, "stream": False, "format": decoding_schema(), "options": {"temperature": 0, "num_predict": OUTPUT_TOKENS, "num_ctx": num_ctx}}
             if self.settings.model_think is not None:
                 payload["think"] = self.settings.model_think
             result = await self._request("POST", "/api/chat", json=payload)

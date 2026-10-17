@@ -31,7 +31,8 @@ class Settings(BaseModel):
     model_publisher: str = "Qwen"
     model_vision: bool = False
     model_think: bool | None = False
-    model_context_tokens: int = Field(default=8192, ge=4096, le=32768)
+    # Below 8192 the 2048-token output reserve leaves too little room for an observation and the action format.
+    model_context_tokens: int = Field(default=8192, ge=8192, le=32768)
     # Exact process/GPU evidence is supplied by the operator, never inferred from branding.
     hardware_evidence: str = ""
     origins: list[str] = ["http://127.0.0.1:8765", "http://localhost:8765"]

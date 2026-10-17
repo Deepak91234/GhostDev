@@ -71,6 +71,8 @@ def test_clip_keeps_head_and_tail():
     clipped = clip("HEAD"+"-"*1000+"TAIL", 60)
     assert clipped.startswith("HEAD") and clipped.endswith("TAIL") and "omitted" in clipped
     assert estimate_tokens("ab€") == 2
+    # Digits are one token each in Qwen-style tokenizers.
+    assert estimate_tokens("[1262, 44, 18, 928]") >= 11
 
 
 def test_target_resolves_to_visible_center_before_approval(environment):

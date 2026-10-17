@@ -31,7 +31,7 @@ def test_ollama_protocol_and_strict_local_response(environment):
         assert not identity['hardware_verified'] and proposed.kind=='finish'
     asyncio.run(run())
     assert [entry[0] for entry in captured]==['/api/show','/api/chat']
-    assert captured[1][1]['stream'] is False and captured[1][1]['format']['additionalProperties'] is False
+    assert captured[1][1]['stream'] is False and all(branch['additionalProperties'] is False for branch in captured[1][1]['format']['anyOf'])
     assert captured[1][1]['think'] is False and captured[1][1]['options']['num_ctx']==8192
 
 

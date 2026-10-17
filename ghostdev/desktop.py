@@ -33,7 +33,7 @@ def visible_box(bounds, width: int, height: int) -> tuple[int, int, int, int] | 
         return None
     left, top = max(0, bounds[0]), max(0, bounds[1])
     right, bottom = min(width, bounds[0]+bounds[2]), min(height, bounds[1]+bounds[3])
-    if right <= left or bottom <= top:
+    if right-left < 2 or bottom-top < 2:
         return None
     return left, top, right, bottom
 
@@ -120,7 +120,8 @@ class MacDesktop:
                 p, s = self._attr(element, "AXPosition"), self._attr(element, "AXSize")
                 okp, point = self.AX.AXValueGetValue(p, self.AX.kAXValueCGPointType, None)
                 oks, size = self.AX.AXValueGetValue(s, self.AX.kAXValueCGSizeType, None)
-                if okp and oks:
+                # Chrome reports a wholly off-viewport element as a 1-pt strip at the viewport edge; it is not a click target.
+                if okp and oks and size.width >= 2 and size.height >= 2:
                     node["bounds"] = [round((point.x-bounds["X"])*image_size[0]/bounds["Width"]), round((point.y-bounds["Y"])*image_size[1]/bounds["Height"]), round(size.width*image_size[0]/bounds["Width"]), round(size.height*image_size[1]/bounds["Height"])]
             except (TypeError, AttributeError):
                 pass
@@ -197,6 +198,8 @@ class MacDesktop:
                 raise ValueError("target applies only to click, double_click, and scroll")
             if (action.x, action.y) != element_center(observation, action.target):
                 raise ValueError("Coordinates do not match the target element; re-observe")
+        if action.kind in {"click", "double_click"} and action.target < 0 and action.x == 0 and action.y == 0:
+            raise ValueError("A click needs a target element (or explicit x/y); none was given")
         if action.kind in {"click", "double_click"} and not (0 <= action.x < observation["image_width"] and 0 <= action.y < observation["image_height"]):
             raise ValueError("Coordinates outside current window screenshot")
         if action.kind == "scroll":

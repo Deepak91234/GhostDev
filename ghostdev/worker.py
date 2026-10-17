@@ -81,18 +81,20 @@ class Worker:
             with self.store.connect() as db:
                 row = db.execute("SELECT status FROM approvals WHERE id=?", (approval_id,)).fetchone()
             if row[0] == "denied":
-                raise ValueError("Owner denied the proposed action")
+                # Back to RUNNING so the loop re-observes and replans instead of waiting on a dead approval.
+                self.store.transition(task_id, "RUNNING", expect=("AWAITING_APPROVAL", generation))
+                raise ValueError("Owner denied the proposed action; propose a different one")
             if row[0] == "approved":
-                self.store.transition(task_id, "RUNNING")
+                self.store.transition(task_id, "RUNNING", expect=("AWAITING_APPROVAL", generation))
                 return
             if time.time()-task["observation"]["timestamp"] > self.settings.observation_max_age:
-                with self.store.connect() as db:
-                    db.execute("UPDATE approvals SET status='expired' WHERE id=?", (approval_id,))
-                self.store.transition(task_id, "PAUSED", revoke=True)
-                self.store.event(task_id, "action_rejected", {"reason": "Approval expired; resume to observe and replan"})
-                raise LeaseRevoked("Approval expired")
+                break
             await asyncio.sleep(0.15)
-        raise TimeoutError("Approval wait exceeded the observation lifetime")
+        with self.store.connect() as db:
+            db.execute("UPDATE approvals SET status='expired' WHERE id=?", (approval_id,))
+        self.store.transition(task_id, "PAUSED", revoke=True, expect=("AWAITING_APPROVAL", generation))
+        self.store.event(task_id, "action_rejected", {"reason": "Approval expired; resume to observe and replan"})
+        raise LeaseRevoked("Approval expired")
 
     async def run_task(self, initial: dict):
         task_id = initial["id"]
@@ -154,6 +156,7 @@ class Worker:
                     continue
                 generation = current["generation"]
                 guard = lambda: self.store.lease(task_id, generation)
+                action = None
                 try:
                     guard()
                     observation = await self.observation(task_id, workspace)
@@ -202,9 +205,16 @@ class Worker:
                             self.store.event(task_id, "action_rejected", {"reason": "Repeated unchanged observations; inspect and resume"})
                             no_progress = 0
                 except LeaseRevoked:
-                    history.append({"interruption": "Previous action or inference was revoked; observe and replan, never replay"})
+                    marker = {"interruption": "Previous action or inference was revoked; observe and replan, never replay"}
+                    if not history or history[-1] != marker:
+                        history.append(marker)
+                    # Yield instead of spinning while the task is in any state this loop cannot act on.
+                    await asyncio.sleep(0.1)
                     continue
                 except (ValueError, TimeoutError) as exc:
+                    if action is None:
+                        # A failed or refused inference still uses a step, so max_steps and the rejection stop apply.
+                        attempted += 1
                     self.store.event(task_id, "action_rejected", {"reason": str(exc)[:500], "outcome": "Input may be partial if dispatch started; re-observe before any retry"})
                     history.append({"rejected": str(exc)[:500]})
                     if attempted >= 3 and all("rejected" in item for item in history[-3:]):

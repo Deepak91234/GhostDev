@@ -93,6 +93,8 @@ def main():
             from .bench import run_bench
             try:
                 report = asyncio.run(run_bench(settings, args.runs))
+            except httpx.HTTPStatusError as exc:
+                raise ValueError(f"Local model server answered HTTP {exc.response.status_code} for {exc.request.url.path}; check that {settings.model_name} is pulled (ollama pull {settings.model_name})") from exc
             except httpx.HTTPError as exc:
                 raise ValueError("Local model server unreachable: "+str(exc)) from exc
             target = settings.state_dir/"bench"

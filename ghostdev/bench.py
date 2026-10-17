@@ -51,6 +51,8 @@ def grade(action, current: dict) -> dict:
         return {"valid": True, "grounded": False, "reason": f"expected_app is {action.expected_app[:40]!r}; the current app is {current['app']!r}"}
     if action.kind != "click":
         return {"valid": True, "grounded": False, "reason": f"Proposed {action.kind}; a click on the text area was expected"}
+    if action.target < 0 and action.x == 0 and action.y == 0:
+        return {"valid": True, "grounded": False, "reason": "Click has no target element and no coordinates; the worker rejects it"}
     try:
         x, y = element_center(current, action.target) if action.target >= 0 else (action.x, action.y)
     except ValueError as exc:
@@ -89,7 +91,9 @@ def summarize(runs: list[dict]) -> dict:
 
 async def run_bench(settings: Settings, runs: int, transport=None) -> dict:
     model = LocalModel(settings, transport)
-    report = {"evidence_scope": SCOPE, "started": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "host": host(), "model": await model.doctor(), "settings": {"model_context_tokens": settings.model_context_tokens, "model_think": settings.model_think, "model_vision": settings.model_vision}, "runs": []}
+    report = {"evidence_scope": SCOPE, "started": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "host": host(), "model": await model.doctor(), "settings": {"model_context_tokens": settings.model_context_tokens, "model_think": settings.model_think, "model_vision": settings.model_vision, "image_sent": False}, "runs": []}
+    if settings.model_vision:
+        report["evidence_scope"] += " Vision is enabled but the bench sends no screenshot, so these figures are text-only."
     for index in range(runs):
         current = observation()
         started = time.monotonic()

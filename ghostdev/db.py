@@ -89,12 +89,15 @@ class Store:
             data.update(fields)
             db.execute("UPDATE tasks SET data=? WHERE id=?", (json.dumps(data), task_id))
 
-    def transition(self, task_id: str, state: str, *, revoke=False):
+    def transition(self, task_id: str, state: str, *, revoke=False, expect: tuple[str, int] | None = None):
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            row = db.execute("SELECT state FROM tasks WHERE id=?", (task_id,)).fetchone()
+            row = db.execute("SELECT state,generation FROM tasks WHERE id=?", (task_id,)).fetchone()
             if not row:
                 raise KeyError("Task not found")
+            # Atomic compare-and-set: a pause or stop that landed first must not be overwritten.
+            if expect is not None and (row[0], row[1]) != expect:
+                raise LeaseRevoked("Task state changed before this transition")
             if row[0] == state:
                 return
             if state not in TRANSITIONS.get(row[0], set()):
